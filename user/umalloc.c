@@ -88,3 +88,39 @@ malloc(uint nbytes)
         return 0;
   }
 }
+
+// Реализация realloc для xv6
+void*
+realloc(void *ptr, unsigned long size)
+{
+  // Если указатель NULL, работаем как malloc
+  if (ptr == 0)
+    return malloc((uint)size);
+  
+  // Если размер 0, работаем как free
+  if (size == 0) {
+    free(ptr);
+    return 0;
+  }
+  
+  // Получаем информацию о размере старого блока
+  Header *hp = (Header*)ptr - 1;
+  uint old_size = (hp->s.size - 1) * sizeof(Header); // Размер в байтах
+  
+  // Если новый размер меньше или равен старому, просто возвращаем текущий указатель
+  if (size <= old_size)
+    return ptr;
+  
+  // Выделяем новый блок памяти
+  void *new_ptr = malloc((uint)size);
+  if (new_ptr == 0)
+    return 0;
+  
+  // Копируем данные из старого блока в новый
+  memmove(new_ptr, ptr, old_size < size ? old_size : size);
+  
+  // Освобождаем старый блок
+  free(ptr);
+  
+  return new_ptr;
+}

@@ -41,12 +41,23 @@ int main(void) {
     printf("Test 4: Increasing buffer size\n");
     int size = 2;
     struct procinfo *buf = malloc(size * sizeof(struct procinfo));
+    if (!buf) {
+        printf("Failed to allocate memory\n");
+        exit(1);
+    }
+    
     while ((ret = ps_listinfo(buf, size)) < 0) {
         if (ret == -2) {
             size *= 2;
             printf("Increasing buffer to %d entries...\n", size);
-            free(buf);
-            buf = malloc(size * sizeof(struct procinfo));
+            
+            struct procinfo *new_buf = realloc(buf, size * sizeof(struct procinfo));
+            if (!new_buf) {
+                printf("Failed to reallocate memory\n");
+                free(buf);
+                exit(1);
+            }
+            buf = new_buf;
         } else {
             printf("Failed with error: %s (code: %d)\n", get_error_message(ret), ret);
             break;

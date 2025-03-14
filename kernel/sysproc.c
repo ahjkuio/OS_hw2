@@ -116,8 +116,6 @@ uint64 sys_ps_listinfo(void) {
         }
         return count;
     }
-
-    acquire(&wait_lock);
   
     for (p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
@@ -126,7 +124,6 @@ uint64 sys_ps_listinfo(void) {
             // Проверяем лимит перед копированием 
             if (written >= lim) {
                 release(&p->lock);
-                release(&wait_lock);
                 return -2; // Недостаточный размер буфера
             }
 
@@ -135,14 +132,24 @@ uint64 sys_ps_listinfo(void) {
             safestrcpy(pi.name, p->name, sizeof(pi.name));
             pi.pid = p->pid;
             pi.state = p->state;
-            pi.ppid = (p->parent) ? p->parent->pid : 0;
+            
+            // Получаем ppid - только здесь нужен wait_lock
+            acquire(&wait_lock);
+            if (p->parent) {
+                // Захватываем лок родительского процесса перед доступом к нему
+                acquire(&p->parent->lock);
+                pi.ppid = p->parent->pid;
+                release(&p->parent->lock);
+            } else {
+                pi.ppid = 0;
+            }
+            release(&wait_lock);
 
             // Пытаемся скопировать в пользовательский буфер
             if (copyout(myproc()->pagetable, 
                         plist_addr + written * sizeof(struct procinfo), 
                         (char*)&pi, sizeof(pi)) < 0) {
                 release(&p->lock);
-                release(&wait_lock);
                 return -3; // Ошибка копирования в пользовательское пространство
             }
 
@@ -152,6 +159,5 @@ uint64 sys_ps_listinfo(void) {
         release(&p->lock);
     }
 
-    release(&wait_lock);
     return written; // Возвращаем количество записанных процессов
 }

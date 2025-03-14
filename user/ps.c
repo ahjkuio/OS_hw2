@@ -31,8 +31,32 @@ int main(void) {
 
   // Получаем информацию о процессах
   int ret = ps_listinfo(plist, count);
+  
+  // Если буфер слишком мал (количество процессов увеличилось)
+  while(ret == -2) {
+    // Получаем актуальное количество процессов
+    count = ps_listinfo(0, 0);
+    if(count < 0) {
+      fprintf(2, "ps: error getting process count\n");
+      free(plist);
+      exit(1);
+    }
+    
+    // Увеличиваем размер буфера
+    struct procinfo *new_plist = realloc(plist, count * sizeof(struct procinfo));
+    if(!new_plist) {
+      fprintf(2, "ps: realloc failed\n");
+      free(plist);
+      exit(1);
+    }
+    plist = new_plist;
+    
+    // Пробуем снова получить информацию
+    ret = ps_listinfo(plist, count);
+  }
+  
   if(ret < 0) {
-    fprintf(2, "ps: error getting process info\n");
+    fprintf(2, "ps: error getting process info: %d\n", ret);
     free(plist);
     exit(1);
   }
